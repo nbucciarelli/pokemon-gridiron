@@ -11,6 +11,7 @@ Draft a 22-player football team from the Pokédex. Pick a position on the field,
 - Fuzzy search by name or Pokédex number (`pkchu` and `pikachoo` both find Pikachu), plus a type filter
 - Scouting card with types, height, weight and base HP, Attack, Defense and Speed
 - Auto-fill empty positions, clear the roster, and copy the lineup as text to share
+- Export and import teams as a short code (`PG1.…`) or a share link that opens the team for import
 - Your lineup, team name and generation picks are saved in your browser
 
 ## Run it locally

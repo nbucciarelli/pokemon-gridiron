@@ -374,6 +374,27 @@
     toast('Roster cleared.');
   });
 
+  // Resolves true when the text reached the clipboard.
+  function copyText(text) {
+    const fallback = () => {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;left:-9999px';
+      (document.querySelector('dialog[open]') || document.body).appendChild(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) {}
+      ta.remove();
+      return ok;
+    };
+    try {
+      return navigator.clipboard.writeText(text).then(() => true, fallback);
+    } catch (e) {
+      return Promise.resolve(fallback());
+    }
+  }
+
   document.getElementById('copy').addEventListener('click', () => {
     const line = (p) => p.pos.padEnd(4) + (state.roster[p.id] ? mon(state.roster[p.id]).name : '(open)');
     const text = [
@@ -381,21 +402,128 @@
       'OFFENSE', ...POSITIONS.filter((p) => p.side === 'off').map(line), '',
       'DEFENSE', ...POSITIONS.filter((p) => p.side === 'def').map(line)
     ].join('\n');
-    const fallback = () => {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.setAttribute('readonly', '');
-      ta.style.cssText = 'position:fixed;left:-9999px';
-      document.body.appendChild(ta);
-      ta.select();
-      let ok = false;
-      try { ok = document.execCommand('copy'); } catch (e) {}
-      ta.remove();
-      toast(ok ? 'Lineup copied. Paste it anywhere to share.' : 'Copying is blocked in this view. Open the page in a full browser tab to copy.');
-    };
-    try {
-      navigator.clipboard.writeText(text).then(() => toast('Lineup copied. Paste it anywhere to share.'), fallback);
-    } catch (e) { fallback(); }
+    copyText(text).then((ok) => toast(ok ? 'Lineup copied. Paste it anywhere to share.' : 'Your browser blocked copying. Select the lineup and copy it by hand.'));
+  });
+
+  /* ---------- Team codes ----------
+     A code is "PG1." + base64url of:
+       [version=1] [generation bitmask: 2 bytes] [22 × Pokédex number: 2 bytes each, in ORDER, 0 = open]
+       [team name length: 1 byte] [team name: UTF-8] [CRC-16/CCITT of everything before it: 2 bytes]
+     The checksum catches codes that were cut off or mistyped. */
+  const CODE_PREFIX = 'PG1.';
+  const LINK_KEY = '#team=';
+
+  function crc16(bytes) {
+    let crc = 0xffff;
+    for (const b of bytes) {
+      crc ^= b << 8;
+      for (let i = 0; i < 8; i++) crc = crc & 0x8000 ? ((crc << 1) ^ 0x1021) & 0xffff : (crc << 1) & 0xffff;
+    }
+    return crc;
+  }
+  const toB64url = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  function fromB64url(s) {
+    const b64 = s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4);
+    return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  }
+
+  function encodeTeam() {
+    let mask = 0;
+    state.gens.forEach((g) => { mask |= 1 << (g - 1); });
+    const name = new TextEncoder().encode(state.team.trim().slice(0, 40)); // ≤ 160 bytes, fits the length byte
+    const bytes = [1, (mask >> 8) & 255, mask & 255];
+    ORDER.forEach((id) => { const n = state.roster[id] || 0; bytes.push((n >> 8) & 255, n & 255); });
+    bytes.push(name.length, ...name);
+    const crc = crc16(bytes);
+    bytes.push(crc >> 8, crc & 255);
+    return CODE_PREFIX + toB64url(bytes);
+  }
+
+  // Returns { team, roster, gens } or { error } with a message the viewer can act on.
+  function decodeTeam(text) {
+    let s = String(text || '');
+    const at = s.indexOf(LINK_KEY);
+    if (at >= 0) s = s.slice(at + LINK_KEY.length);
+    s = s.replace(/\s+/g, '');
+    if (!s) return { error: '' };
+    if (!s.startsWith(CODE_PREFIX)) return { error: 'That isn\'t a Pokémon Gridiron team code. Codes start with ' + CODE_PREFIX };
+    let bytes;
+    try { bytes = fromB64url(s.slice(CODE_PREFIX.length)); } catch (e) { bytes = null; }
+    const fixed = 3 + ORDER.length * 2 + 1;
+    if (!bytes || bytes.length < fixed + 2 || bytes.length !== fixed + bytes[fixed - 1] + 2 ||
+        crc16(bytes.subarray(0, bytes.length - 2)) !== ((bytes[bytes.length - 2] << 8) | bytes[bytes.length - 1])) {
+      return { error: 'This code is incomplete or has a typo. Copy the whole code again and paste it here.' };
+    }
+    if (bytes[0] !== 1) return { error: 'This code was made by a newer version of Pokémon Gridiron. Reload the page and try again.' };
+    const mask = (bytes[1] << 8) | bytes[2];
+    const gens = new Set(GENS.filter((G) => mask & (1 << (G.g - 1))).map((G) => G.g));
+    const roster = {};
+    const seen = new Set();
+    ORDER.forEach((id, i) => {
+      const n = (bytes[3 + i * 2] << 8) | bytes[4 + i * 2];
+      if (n >= 1 && n <= DEX.length && !seen.has(n)) { roster[id] = n; seen.add(n); }
+    });
+    const team = new TextDecoder().decode(bytes.subarray(fixed, fixed + bytes[fixed - 1])).slice(0, 40);
+    return { team, roster, gens };
+  }
+
+  const shareDialog = document.getElementById('share-dialog');
+  const exportBox = document.getElementById('export-code');
+  const importBox = document.getElementById('import-code');
+  const importStatus = document.getElementById('import-status');
+  const importBtn = document.getElementById('import-load');
+  let pending = null;
+
+  const shareLink = (code) => location.origin + location.pathname + LINK_KEY + code;
+  const romanList = (gens) => GENS.filter((G) => gens.has(G.g)).map((G) => G.roman).join(', ') || 'none';
+
+  function checkImport() {
+    const r = decodeTeam(importBox.value);
+    pending = r.error === undefined ? r : null;
+    importBtn.disabled = !pending;
+    importStatus.classList.toggle('ok', !!pending);
+    importStatus.classList.toggle('bad', !!r.error);
+    importStatus.textContent = pending
+      ? 'Ready to load ' + (pending.team ? '“' + pending.team + '”' : 'an unnamed team') + ': ' +
+        Object.keys(pending.roster).length + ' of 22 positions filled, Gens ' + romanList(pending.gens) + '.'
+      : (r.error || '');
+  }
+
+  function openShare(importText) {
+    exportBox.value = encodeTeam();
+    importBox.value = importText || '';
+    checkImport();
+    if (!shareDialog.open) shareDialog.showModal();
+    (importText ? importBtn : exportBox).focus();
+    if (!importText) exportBox.select();
+  }
+
+  function flashButton(btn, ok) {
+    const label = btn.dataset.label || (btn.dataset.label = btn.textContent);
+    btn.textContent = ok ? 'Copied' : 'Copy blocked';
+    clearTimeout(btn._t);
+    btn._t = setTimeout(() => { btn.textContent = label; }, 1800);
+    if (!ok) exportBox.select();
+  }
+
+  document.getElementById('share').addEventListener('click', () => openShare(''));
+  document.getElementById('share-close').addEventListener('click', () => shareDialog.close());
+  shareDialog.addEventListener('click', (e) => { if (e.target === shareDialog) shareDialog.close(); });
+  exportBox.addEventListener('focus', () => exportBox.select());
+  document.getElementById('copy-code').addEventListener('click', (e) => { const b = e.currentTarget; copyText(exportBox.value).then((ok) => flashButton(b, ok)); });
+  document.getElementById('copy-link').addEventListener('click', (e) => { const b = e.currentTarget; copyText(shareLink(exportBox.value)).then((ok) => flashButton(b, ok)); });
+  importBox.addEventListener('input', checkImport);
+  importBtn.addEventListener('click', () => {
+    if (!pending) return;
+    state.roster = pending.roster;
+    state.team = pending.team;
+    if (pending.gens.size) state.gens = pending.gens;
+    state.active = nextEmpty() || 'QB';
+    teamInput.value = state.team;
+    syncGenBoxes();
+    commit();
+    shareDialog.close();
+    toast('Loaded ' + (state.team ? '“' + state.team + '”' : 'the team') + '.');
   });
 
   const teamInput = document.getElementById('team');
@@ -407,5 +535,16 @@
   teamInput.value = state.team;
   syncGenBoxes();
   render();
-  if (state.sample) toast('This is a sample lineup. Tap any position to start drafting your own, or Clear all.');
+  // A share link carries a code in its hash: offer it for import, never load it without asking.
+  function openLinkedTeam() {
+    if (!location.hash.startsWith(LINK_KEY)) return false;
+    const code = location.hash;
+    history.replaceState(null, '', location.pathname + location.search);
+    openShare(code);
+    return true;
+  }
+  window.addEventListener('hashchange', openLinkedTeam);
+  if (!openLinkedTeam() && state.sample) {
+    toast('This is a sample lineup. Tap any position to start drafting your own, or Clear all.');
+  }
 })();

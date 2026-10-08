@@ -33,7 +33,8 @@
       </div>
       <button class="btn" id="autofill" type="button">Auto-fill empty</button>
       <button class="btn" id="clear" type="button">Clear all</button>
-      <button class="btn btn-primary" id="copy" type="button">Copy lineup</button>
+      <button class="btn" id="copy" type="button">Copy lineup</button>
+      <button class="btn btn-primary" id="share" type="button" aria-haspopup="dialog">Export / Import</button>
     </div>
   </header>
 
@@ -89,6 +90,33 @@
 
   <footer class="muted">Artwork and base stats from <a href="https://pokeapi.co" target="_blank" rel="noopener">PokéAPI</a>. Pokémon © Nintendo, Game Freak, Creatures. Your lineup is saved in this browser only.<br><span class="disclaimer">A fan project, not affiliated with or endorsed by Nintendo, Game Freak, Creatures or The Pokémon Company. <a href="https://github.com/nbucciarelli/pokemon-gridiron" target="_blank" rel="noopener">Source on GitHub</a>.</span></footer>
 </div>
+
+<dialog class="dialog" id="share-dialog" aria-labelledby="share-title">
+  <div class="dialog-head">
+    <h2 id="share-title">Export or import a team</h2>
+    <button class="iconbtn" id="share-close" type="button" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <section class="dialog-section">
+    <label class="eyebrow" for="export-code">Your team code</label>
+    <p class="muted">Send this code to anyone. They paste it under Import to load your exact lineup, team name and generations.</p>
+    <textarea class="input code" id="export-code" rows="3" readonly spellcheck="false"></textarea>
+    <div class="dialog-actions">
+      <button class="btn btn-primary" id="copy-code" type="button">Copy code</button>
+      <button class="btn" id="copy-link" type="button">Copy share link</button>
+    </div>
+  </section>
+  <section class="dialog-section">
+    <label class="eyebrow" for="import-code">Import a team</label>
+    <p class="muted">Paste a team code or a share link. Loading replaces your current lineup and team name.</p>
+    <textarea class="input code" id="import-code" rows="3" spellcheck="false" autocomplete="off" placeholder="PG1.…"></textarea>
+    <p class="import-status" id="import-status" role="status" aria-live="polite"></p>
+    <div class="dialog-actions">
+      <button class="btn btn-primary" id="import-load" type="button" disabled>Load team</button>
+    </div>
+  </section>
+</dialog>
 
 <script src="js/app.js"></script>
 </body>
