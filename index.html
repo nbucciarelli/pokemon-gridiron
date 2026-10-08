@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pokémon Gridiron</title>
+<meta name="description" content="Draft a 22-player football team from all 1,025 Pokémon. Pick by generation, search, compare base stats, and copy your lineup to share.">
+<meta property="og:title" content="Pokémon Gridiron">
+<meta property="og:description" content="Draft a 22-player football team from all 1,025 Pokémon.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#0c1117">
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow" id="eligible">Gen I · 151 eligible</div>
+      <h1>Pokémon <span>Gridiron</span></h1>
+    </div>
+    <div class="controls">
+      <label class="lbl" style="width: 240px; max-width: 100%;">
+        <span class="eyebrow">Team name</span>
+        <input class="input" id="team" type="text" maxlength="40" placeholder="e.g. Pallet Town Pidgeys">
+      </label>
+      <div class="count">
+        <span class="eyebrow">Rostered</span>
+        <b><span id="count">0</span><small> / 22</small></b>
+      </div>
+      <button class="btn" id="autofill" type="button">Auto-fill empty</button>
+      <button class="btn" id="clear" type="button">Clear all</button>
+      <button class="btn btn-primary" id="copy" type="button">Copy lineup</button>
+    </div>
+  </header>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+
+  <div class="main">
+    <div class="left">
+      <div class="field-scroll">
+        <div class="field" id="field">
+          <div class="sideline"></div>
+          <div class="hash" style="left: 37%"></div>
+          <div class="hash" style="left: 62%"></div>
+          <div class="yard" style="top: 4%"></div>
+          <div class="yard" style="top: 18%"></div>
+          <div class="fd" style="top: 33%"></div>
+          <div class="los" style="top: 48%"></div>
+          <div class="yard" style="top: 63%"></div>
+          <div class="yard" style="top: 78%"></div>
+          <div class="yard" style="top: 96%"></div>
+          <div class="side-label" style="top: 14%">DEFENSE</div>
+          <div class="side-label" style="top: 64%">OFFENSE</div>
+        </div>
+      </div>
+      <div class="lists">
+        <div class="panel"><div class="eyebrow">Offense</div><div id="list-off"></div></div>
+        <div class="panel"><div class="eyebrow">Defense · 3-4</div><div id="list-def"></div></div>
+      </div>
+    </div>
+
+    <aside class="panel">
+      <div class="now" id="now"></div>
+      <fieldset class="gens" aria-labelledby="gens-label">
+        <div class="gens-head">
+          <span class="eyebrow" id="gens-label">Generations in the Pokédex</span>
+          <div><button type="button" class="linkbtn" id="gens-all">All</button> <button type="button" class="linkbtn" id="gens-one">Gen I only</button></div>
+        </div>
+        <div class="gen-list" id="gens"></div>
+      </fieldset>
+      <div class="filters">
+        <label class="lbl">
+          <span class="eyebrow">Search</span>
+          <input class="input" id="q" type="search" placeholder="Name or number">
+        </label>
+        <label class="lbl">
+          <span class="eyebrow">Type</span>
+          <select class="input" id="type"><option value="all">All types</option></select>
+        </label>
+      </div>
+      <div class="muted" id="results" style="font-size: 13px;"></div>
+      <div class="cards" id="cards"></div>
+    </aside>
+  </div>
+
+  <footer class="muted">Artwork and base stats from <a href="https://pokeapi.co" target="_blank" rel="noopener">PokéAPI</a>. Pokémon © Nintendo, Game Freak, Creatures. Your lineup is saved in this browser only.<br><span class="disclaimer">A fan project, not affiliated with or endorsed by Nintendo, Game Freak, Creatures or The Pokémon Company. <a href="https://github.com/nbucciarelli/pokemon-gridiron" target="_blank" rel="noopener">Source on GitHub</a>.</span></footer>
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
